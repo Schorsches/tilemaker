@@ -1,0 +1,28 @@
+{
+    "layers": {
+        "water_polygons": {
+            "minzoom": 4,
+            "maxzoom": 14
+        }
+    },
+    "settings": {
+        "minzoom": 0,
+        "maxzoom": 14,
+        "basezoom": 14,
+        "include_ids": false,
+        "combine_below": 14,
+        "name": "Issue 697 water polygon test",
+        "version": "1.0",
+        "description": "valid geometries desired",
+        "compress": "gzip",
+        "filemetadata": {
+            "tilejson": "2.0.0",
+            "scheme": "xyz",
+            "type": "baselayer",
+            "format": "pbf",
+            "tiles": [
+                "https://example.com/flevoland/{z}/{x}/{y}.pbf"
+            ]
+        }
+    }
+}
