@@ -112,18 +112,22 @@ MU_TEST(test_options_parser) {
 	{
 		std::vector<std::string> args = {"--output", "foo.mbtiles", "--input", "ontario.pbf"};
 		auto opts = parse(args);
-		mu_check(opts.validateGeometry == GeometryValidationMode::Fast);
+		mu_check(opts.geometryValidationMode == GeometryValidationMode::Fast);
 	}
 	{
 		std::vector<std::string> args = {"--output", "foo.mbtiles", "--input", "ontario.pbf", "--validate-geometry", "off"};
 		auto opts = parse(args);
-		mu_check(opts.validateGeometry == GeometryValidationMode::Off);
+		mu_check(opts.geometryValidationMode == GeometryValidationMode::Off);
 	}
+#ifdef TILEMAKER_USE_GEOS
 	{
 		std::vector<std::string> args = {"--output", "foo.mbtiles", "--input", "ontario.pbf", "--validate-geometry", "strict"};
 		auto opts = parse(args);
-		mu_check(opts.validateGeometry == GeometryValidationMode::Strict);
+		mu_check(opts.geometryValidationMode == GeometryValidationMode::Strict);
 	}
+#else
+	ASSERT_THROWS("requires TILEMAKER_USE_GEOS", "--output", "foo.mbtiles", "--input", "ontario.pbf", "--validate-geometry", "strict");
+#endif
 
 	ASSERT_THROWS("Couldn't open .json config", "--input", "foo", "--output", "bar", "--config", "nonexistent-config.json");
 	ASSERT_THROWS("Couldn't open .lua script", "--input", "foo", "--output", "bar", "--process", "nonexistent-script.lua");

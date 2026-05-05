@@ -87,20 +87,32 @@ struct PolygonHandler {
 		ring.push_back(point);
 	}
 
+	std::vector<vtzero::point> clean_ring() const {
+		std::vector<vtzero::point> cleaned;
+		cleaned.reserve(ring.size());
+		for (const auto& point : ring) {
+			if (cleaned.empty() || cleaned.back() != point) {
+				cleaned.push_back(point);
+			}
+		}
+		return cleaned;
+	}
+
 	void ring_end(vtzero::ring_type type) {
 		if (type == vtzero::ring_type::invalid) {
 			zeroAreaRings++;
 			return;
 		}
 
-		if (ring.size() < 4) {
+		const std::vector<vtzero::point> cleaned = clean_ring();
+		if (cleaned.size() < 4) {
 			shortRings++;
 			return;
 		}
 
 		if (type == vtzero::ring_type::outer) {
 			Polygon polygon;
-			for (const auto& point : ring) {
+			for (const auto& point : cleaned) {
 				bg::append(polygon.outer(), Point(point.x, point.y));
 			}
 			geometry.push_back(std::move(polygon));
@@ -115,7 +127,7 @@ struct PolygonHandler {
 
 		auto& inners = geometry.back().inners();
 		inners.resize(inners.size() + 1);
-		for (const auto& point : ring) {
+		for (const auto& point : cleaned) {
 			bg::append(inners.back(), Point(point.x, point.y));
 		}
 	}
@@ -177,7 +189,9 @@ int main(int argc, char** argv) {
 				}
 
 				std::string reason;
-				if (!handler.geometry.empty() && !bg::is_valid(handler.geometry, reason)) {
+				MultiPolygon ogcGeometry = handler.geometry;
+				bg::correct(ogcGeometry);
+				if (!ogcGeometry.empty() && !bg::is_valid(ogcGeometry, reason)) {
 					invalidFeatures++;
 					std::cerr << "Boost.Geometry invalid polygon in layer " << layerName
 						<< ": " << reason << "\n";

@@ -244,11 +244,11 @@ void writeMultiPolygon(
 		}
 		sharedData.geometryValidationStats.collapsedRings += tilemaker::geometry::remove_collapsed_rings(current);
 
-		if (!result.valid || geom::is_empty(current) || !geom::is_valid(current, failure)) {
+		if (!result.valid || geom::is_empty(current)) {
 			sharedData.geometryValidationStats.skippedFeatures++;
 			if (verbose) {
 				cout << "skipping output multipolygon after geometry validation";
-				if (failure) {
+				if (geom::is_valid(current, failure) && failure) {
 					cout << ": " << boost_validity_error(failure);
 				}
 				cout << endl;
@@ -256,7 +256,15 @@ void writeMultiPolygon(
 			return;
 		}
 
+		sharedData.geometryValidationStats.collapsedRings += tilemaker::geometry::sanitize_mvt_rings(current);
 		tilemaker::geometry::enforce_mvt_winding(current);
+		geom::remove_spikes(current);
+		sharedData.geometryValidationStats.collapsedRings += tilemaker::geometry::sanitize_mvt_rings(current);
+		sharedData.geometryValidationStats.collapsedRings += tilemaker::geometry::remove_collapsed_rings(current);
+		tilemaker::geometry::enforce_mvt_winding(current);
+		if (tilemaker::geometry::repair_ogc_then_mvt(current).changed) {
+			sharedData.geometryValidationStats.repairedByFast++;
+		}
 		if (!tilemaker::geometry::is_valid_mvt_polygon(current)) {
 			sharedData.geometryValidationStats.skippedFeatures++;
 			if (verbose) {

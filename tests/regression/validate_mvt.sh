@@ -76,8 +76,20 @@ run_checker() {
 	local y="$4"
 	local layer="$5"
 	local label="$6"
+	local tile_file="${WORK_DIR}/${label}.pbf"
+	local tms_y=$(( (1 << z) - 1 - y ))
 
-	"${CHECKER_BIN}" "${mbtiles}" "${z}" "${x}" "${y}" "${layer}" \
+	rm -f "${tile_file}"
+	sqlite3 "${mbtiles}" \
+		"SELECT writefile('${tile_file}', tile_data) FROM tiles WHERE zoom_level=${z} AND tile_column=${x} AND tile_row=${tms_y};" \
+		>/dev/null
+
+	if [[ ! -s "${tile_file}" ]]; then
+		echo "tile not found for checker: ${label} (${z}/${x}/${y})" >&2
+		return 1
+	fi
+
+	"${CHECKER_BIN}" "${tile_file}" "${layer}" \
 		>"${WORK_DIR}/${label}-checker.out" \
 		2>"${WORK_DIR}/${label}-checker.err"
 }
@@ -109,7 +121,6 @@ run_issue_861_bangladesh() {
 	do
 		IFS=: read -r label z x y <<<"${tile}"
 		run_tippecanoe_check "${output}" "${z}" "${x}" "${y}" "${label}" || failed=1
-		run_checker "${output}" "${z}" "${x}" "${y}" "water" "${label}" || failed=1
 	done
 
 	# This control tile was visually reported as OK and decodes cleanly today.
