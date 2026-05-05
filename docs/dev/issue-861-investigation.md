@@ -224,7 +224,96 @@ Conclusion: the exact `tippecanoe-decode` message from #697 is data-version
 sensitive, but current master still emits invalid Flevoland water geometries
 that strict GDAL/GEOS processing detects after decoding the generated MBTiles.
 
-## 3. Current master geometry pipeline
+## 3. #861 Bangladesh reproduction on current master
+
+After the initial Phase 0 report, the Bangladesh examples from #861 were tested
+directly with a current Geofabrik Bangladesh extract and tilemaker's bundled
+default OpenMapTiles resources.
+
+### Data and command
+
+Default OMT shapefile dependencies were prepared with the repository scripts:
+
+```sh
+./get-coastline.sh
+./get-landcover.sh
+```
+
+The OSM extract was:
+
+```sh
+curl -L --fail --retry 4 --retry-delay 4 \
+  -o build/repro/issue-861-bangladesh/bangladesh-latest.osm.pbf \
+  https://download.geofabrik.de/asia/bangladesh-latest.osm.pbf
+```
+
+Tilemaker was run with the default OMT config and process files, clipped to a
+Bangladesh bbox that includes Kaptai Lake and the reported low-zoom ocean tiles:
+
+```sh
+./build/tilemaker \
+  --input build/repro/issue-861-bangladesh/bangladesh-latest.osm.pbf \
+  --output build/repro/issue-861-bangladesh/bangladesh-omt.mbtiles \
+  --bbox 88.0,20.3,92.8,26.8 \
+  --config resources/config-openmaptiles.json \
+  --process resources/process-openmaptiles.lua
+```
+
+The run read the default ocean, urban areas, ice shelf, and glacier shapefiles,
+then generated 71,212 points, 8 lines, and 1,967,484 polygons from the
+Bangladesh PBF. It wrote z0-z14 tiles successfully.
+
+### `tippecanoe-decode` results for #861 tiles
+
+Each #861 tile was decoded individually:
+
+```sh
+tippecanoe-decode build/repro/issue-861-bangladesh/bangladesh-omt.mbtiles Z X Y
+```
+
+Results:
+
+| Issue example | Tile | Exit | `Polygon begins with an inner ring` |
+| ------------- | ---- | ---- | ----------------------------------- |
+| faulty ocean geometry | `3/5/3` | 106 | 1 |
+| faulty ocean geometry | `4/11/7` | 106 | 1 |
+| faulty ocean geometry | `5/23/14` | 106 | 1 |
+| faulty ocean geometry | `7/95/56` | 106 | 1 |
+| Kaptai Lake reported faulty | `7/96/55` | 106 | 1 |
+| Kaptai Lake reported faulty | `9/387/222` | 106 | 1 |
+| Kaptai Lake reported faulty | `10/774/445` | 106 | 1 |
+| Kaptai Lake reported faulty | `11/1548/891` | 106 | 1 |
+| Kaptai Lake z12 control | `12/3097/1783` | 0 | 0 |
+
+The stderr for failing tiles is exactly:
+
+```text
+Polygon begins with an inner ring
+```
+
+I also decoded parent/control tiles derived from the reported Kaptai coordinates:
+`6/48/27` and `8/193/111`. Both also produced the same strict
+`tippecanoe-decode` failure. This does not necessarily contradict #861's visual
+observation that Kaptai "seems to be fine" at z6 and z8; it means the generated
+tiles still contain an MVT polygon ordering/validity error that strict decoders
+reject, even where browser rendering may look acceptable.
+
+### GDAL single-tile round trip
+
+For the same individual tiles, I copied each tile into a one-tile MBTiles file
+and ran GDAL against the `water` layer:
+
+```sh
+ogr2ogr -f GeoJSON out.geojson one-tile.mbtiles water -oo ZOOM_LEVEL=Z
+```
+
+GDAL exited 0 and did not print topology warnings for those single-tile
+`water` layer round trips. This reinforces the point from #697 and #861 that
+consumer behavior varies: MapLibre/OpenLayers/GDAL may tolerate or avoid
+surfacing these particular MVT ring-order failures, while `tippecanoe-decode`
+rejects them deterministically.
+
+## 4. Current master geometry pipeline
 
 ### Top-level dispatch: `src/tilemaker.cpp`
 
@@ -394,7 +483,7 @@ Relation pipeline:
 * Simple closed ways are converted with `llListPolygon` and
   `boost::geometry::correct(poly)` in `include/osm_store.h:332-337`.
 
-## 4. Geometry operation call sites
+## 5. Geometry operation call sites
 
 This list was produced by searching current master for the relevant Boost
 Geometry calls, including calls through the local `geom` alias.
@@ -462,7 +551,7 @@ Additional local simplifier call sites:
 * Visvalingam multipolygon simplification calls `make_valid(output)`:
   `src/visvalingam.cpp:261-264`
 
-## 5. Phase 0 conclusion
+## 6. Phase 0 conclusion
 
 The root-cause hypothesis is consistent with current master:
 
@@ -476,8 +565,14 @@ The root-cause hypothesis is consistent with current master:
    processing reports as invalid after MBTiles output, even though the exact
    #697 `tippecanoe-decode` inner-ring-first failure was not reproduced with the
    current Netherlands extract.
+5. Current master reproduces the exact #861 Bangladesh / default OMT symptom:
+   all reported ocean and Kaptai Lake tiles checked with `tippecanoe-decode`
+   fail with `Polygon begins with an inner ring`.
 
 Proceeding to Phase 1 is reasonable only if the regression fixture is pinned to
 data that fails deterministically on master. The current live Geofabrik
 Netherlands extract is sufficient to demonstrate GDAL/GEOS topology errors, but
-it is not sufficient for the exact #697 `tippecanoe-decode` error text.
+it is not sufficient for the exact #697 `tippecanoe-decode` error text. The
+current live Geofabrik Bangladesh extract with default OMT resources is
+sufficient to reproduce the exact `tippecanoe-decode` inner-ring-first failure
+reported in #861.
