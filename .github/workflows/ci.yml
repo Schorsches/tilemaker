@@ -97,6 +97,27 @@ jobs:
           ${{ github.workspace }}/resources
           ${{ github.workspace }}/build/${{ matrix.executable }}
 
+  geometry-regression:
+    name: Geometry regression harness
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential libboost-dev libboost-filesystem-dev libboost-program-options-dev libboost-system-dev lua5.1 liblua5.1-0-dev libshp-dev libsqlite3-dev rapidjson-dev zlib1g-dev sqlite3 tippecanoe
+
+    - name: Build tilemaker
+      run: |
+        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
+        cmake --build build --parallel 2
+
+    - name: Run MVT geometry regression harness
+      run: |
+        CXX=g++ TILEMAKER_BIN="${{ github.workspace }}/build/tilemaker" tests/regression/validate_mvt.sh
+
   unix-makefile-build:
     strategy:
       matrix:
