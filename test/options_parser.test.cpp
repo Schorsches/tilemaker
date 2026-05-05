@@ -108,8 +108,26 @@ MU_TEST(test_options_parser) {
 		mu_check(!opts.osm.shardStores);
 	}
 
+	// Geometry validation defaults to fast, with explicit rollback options.
+	{
+		std::vector<std::string> args = {"--output", "foo.mbtiles", "--input", "ontario.pbf"};
+		auto opts = parse(args);
+		mu_check(opts.validateGeometry == GeometryValidationMode::Fast);
+	}
+	{
+		std::vector<std::string> args = {"--output", "foo.mbtiles", "--input", "ontario.pbf", "--validate-geometry", "off"};
+		auto opts = parse(args);
+		mu_check(opts.validateGeometry == GeometryValidationMode::Off);
+	}
+	{
+		std::vector<std::string> args = {"--output", "foo.mbtiles", "--input", "ontario.pbf", "--validate-geometry", "strict"};
+		auto opts = parse(args);
+		mu_check(opts.validateGeometry == GeometryValidationMode::Strict);
+	}
+
 	ASSERT_THROWS("Couldn't open .json config", "--input", "foo", "--output", "bar", "--config", "nonexistent-config.json");
 	ASSERT_THROWS("Couldn't open .lua script", "--input", "foo", "--output", "bar", "--process", "nonexistent-script.lua");
+	ASSERT_THROWS("Invalid --validate-geometry", "--input", "foo", "--output", "bar", "--validate-geometry", "maybe");
 }
 
 MU_TEST_SUITE(test_suite_options_parser) {
