@@ -336,6 +336,7 @@ int main(const int argc, const char* argv[]) {
 	sharedData.outputFile = options.outputFile;
 	sharedData.outputMode = options.outputMode;
 	sharedData.mergeSqlite = options.mergeSqlite;
+	sharedData.geometryValidationMode = options.geometryValidationMode;
 
 	// ----	Initialise mbtiles/pmtiles if required
 	
@@ -552,6 +553,17 @@ int main(const int argc, const char* argv[]) {
 		sharedData.pmtiles.close(metadata);
 	} else {
 		sharedData.writeFileMetadata(jsonConfig);
+	}
+
+	const auto& geometryStats = sharedData.geometryValidationStats;
+	if (options.geometryValidationMode != OptionsParser::GeometryValidationMode::Off ||
+			geometryStats.skippedFeatures.load() > 0) {
+		cout << endl << "Geometry validation: repaired="
+		     << geometryStats.repairedByFast.load()
+		     << ", strict_repaired=" << geometryStats.repairedByStrict.load()
+		     << ", skipped=" << geometryStats.skippedFeatures.load()
+		     << ", collapsed_rings=" << geometryStats.collapsedRings.load()
+		     << endl;
 	}
 
 #ifndef _MSC_VER

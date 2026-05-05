@@ -27,6 +27,7 @@ po::options_description getParser(OptionsParser::Options& options) {
 		("process",po::value< string >(&options.luaFile)->default_value("process.lua"),  "tag-processing Lua file")
 		("quiet",  po::bool_switch(&options.quiet),                                      "quiet, suppress standard output")
 		("verbose",po::bool_switch(&options.verbose),                                   "verbose error output")
+		("validate-geometry", po::value<string>()->default_value("fast"), "post-quantization polygon validation: off, fast, or strict")
 		("skip-integrity",po::bool_switch(&options.osm.skipIntegrity),                       "don't enforce way/node integrity")
 		("log-tile-timings", po::bool_switch(&options.logTileTimings), "log how long each tile takes");
 	po::options_description performance("Performance options");
@@ -84,6 +85,22 @@ OptionsParser::Options OptionsParser::parse(const int argc, const char* argv[]) 
 		options.showHelp = true;
 		return options;
 	}
+
+	const std::string validateGeometry = vm["validate-geometry"].as<string>();
+	if (validateGeometry == "off") {
+		options.geometryValidationMode = GeometryValidationMode::Off;
+	} else if (validateGeometry == "fast") {
+		options.geometryValidationMode = GeometryValidationMode::Fast;
+	} else if (validateGeometry == "strict") {
+#ifdef TILEMAKER_USE_GEOS
+		options.geometryValidationMode = GeometryValidationMode::Strict;
+#else
+		throw OptionException{ "--validate-geometry=strict requires TILEMAKER_USE_GEOS=ON" };
+#endif
+	} else {
+		throw OptionException{ "Invalid --validate-geometry value: " + validateGeometry };
+	}
+
 	if (vm.count("output") == 0) {
 		throw OptionException{ "You must specify an output file or directory. Run with --help to find out more." };
 	}

@@ -7,6 +7,7 @@ endif()
 project(tilemaker)
 
 OPTION(TILEMAKER_BUILD_STATIC "Attempt to link dependencies static" OFF)
+option(TILEMAKER_USE_GEOS "Build with GEOS for robust geometry validation" OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -49,6 +50,10 @@ endif()
 find_package(libshp REQUIRED)
 
 find_package(Rapidjson REQUIRED)
+
+if(TILEMAKER_USE_GEOS)
+	find_package(GEOS 3.10 CONFIG REQUIRED)
+endif()
 
 find_package(Lua)
 
@@ -149,6 +154,10 @@ target_link_libraries(tilemaker
 		Boost::filesystem Boost::program_options)
 if(BOOST_HAS_SYSTEM)
 	target_link_libraries(tilemaker Boost::system)
+endif()
+if(TILEMAKER_USE_GEOS)
+	target_link_libraries(tilemaker GEOS::geos_c)
+	target_compile_definitions(tilemaker PRIVATE TILEMAKER_USE_GEOS=1)
 endif()
 
 include(CheckCxxAtomic)

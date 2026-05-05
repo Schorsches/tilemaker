@@ -4,6 +4,7 @@
 #include <boost/filesystem.hpp>
 #include <vtzero/builder.hpp>
 #include <signal.h>
+#include "geometry/make_valid.hpp"
 #include "helpers.h"
 #include "visvalingam.h"
 using namespace std;
@@ -208,7 +209,7 @@ bool writeRing(
 
 void writeMultiPolygon(
 	const AttributeStore& attributeStore,
-	const SharedData& sharedData,
+	SharedData& sharedData,
 	vtzero::layer_builder& vtLayer,
 	const TileBbox& bbox,
 	const OutputObjectID& oo,
@@ -230,8 +231,51 @@ void writeMultiPolygon(
 		return;
 
 	geom::validity_failure_type failure;
-	if (verbose && !geom::is_valid(current, failure)) { 
-		cout << "output multipolygon has " << boost_validity_error(failure) << endl; 
+	if (sharedData.geometryValidationMode != OptionsParser::GeometryValidationMode::Off) {
+		tilemaker::geometry::MakeValidStrategy strategy = sharedData.geometryValidationMode == OptionsParser::GeometryValidationMode::Strict ?
+			tilemaker::geometry::MakeValidStrategy::Geos :
+			tilemaker::geometry::MakeValidStrategy::Boost;
+		tilemaker::geometry::MakeValidResult result = tilemaker::geometry::make_valid(current, strategy);
+		if (result.changed) {
+			sharedData.geometryValidationStats.repairedByFast++;
+		}
+		if (result.usedGeos) {
+			sharedData.geometryValidationStats.repairedByStrict++;
+		}
+		sharedData.geometryValidationStats.collapsedRings += tilemaker::geometry::remove_collapsed_rings(current);
+
+		if (!result.valid || geom::is_empty(current)) {
+			sharedData.geometryValidationStats.skippedFeatures++;
+			if (verbose) {
+				cout << "skipping output multipolygon after geometry validation";
+				if (geom::is_valid(current, failure) && failure) {
+					cout << ": " << boost_validity_error(failure);
+				}
+				cout << endl;
+			}
+			return;
+		}
+
+		sharedData.geometryValidationStats.collapsedRings += tilemaker::geometry::sanitize_mvt_rings(current);
+		tilemaker::geometry::enforce_mvt_winding(current);
+		geom::remove_spikes(current);
+		sharedData.geometryValidationStats.collapsedRings += tilemaker::geometry::sanitize_mvt_rings(current);
+		sharedData.geometryValidationStats.collapsedRings += tilemaker::geometry::remove_collapsed_rings(current);
+		tilemaker::geometry::enforce_mvt_winding(current);
+		if (tilemaker::geometry::repair_ogc_then_mvt(current).changed) {
+			sharedData.geometryValidationStats.repairedByFast++;
+		}
+		if (!tilemaker::geometry::is_valid_mvt_polygon(current)) {
+			sharedData.geometryValidationStats.skippedFeatures++;
+			if (verbose) {
+				cout << "skipping output multipolygon with invalid MVT winding" << endl;
+			}
+			return;
+		}
+	}
+
+	if (verbose && !geom::is_valid(current, failure)) {
+		cout << "output multipolygon has " << boost_validity_error(failure) << endl;
 
 		if (!geom::is_valid(mp, failure)) 
 			cout << "input multipolygon has " << boost_validity_error(failure) << endl; 

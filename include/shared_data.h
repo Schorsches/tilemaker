@@ -2,6 +2,7 @@
 #ifndef _SHARED_DATA_H
 #define _SHARED_DATA_H
 
+#include <atomic>
 #include <vector>
 #include <map>
 
@@ -97,12 +98,21 @@ public:
 class SharedData {
 
 public:
+	struct GeometryValidationStats {
+		std::atomic<uint64_t> repairedByFast{0};
+		std::atomic<uint64_t> repairedByStrict{0};
+		std::atomic<uint64_t> skippedFeatures{0};
+		std::atomic<uint64_t> collapsedRings{0};
+	};
+
 	const class LayerDefinition &layers;
 	OptionsParser::OutputMode outputMode;
+	OptionsParser::GeometryValidationMode geometryValidationMode;
 	bool mergeSqlite;
 	MBTiles mbtiles;
 	PMTiles pmtiles;
 	std::string outputFile;
+	GeometryValidationStats geometryValidationStats;
 
 	Config &config;
 

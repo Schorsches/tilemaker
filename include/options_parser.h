@@ -20,6 +20,7 @@ namespace OptionsParser {
 	};
 
 	enum class OutputMode: char { File = 0, MBTiles = 1, PMTiles = 2 };
+	enum class GeometryValidationMode: char { Off = 0, Fast = 1, Strict = 2 };
 
 	struct OsmOptions {
 		std::string storeFile;
@@ -39,6 +40,7 @@ namespace OptionsParser {
 		uint32_t threadNum = 0;
 		std::string outputFile;
 		std::string bbox;
+		std::string geometryValidationRaw = "fast";
 
 		OsmOptions osm;
 		bool showHelp = false;
@@ -46,6 +48,7 @@ namespace OptionsParser {
 		bool verbose = false;
 		bool mergeSqlite = false;
 		OutputMode outputMode = OutputMode::File;
+		GeometryValidationMode geometryValidationMode = GeometryValidationMode::Fast;
 		bool logTileTimings = false;
 	};
 
